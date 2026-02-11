@@ -100,7 +100,7 @@ class MLPClassifierDeep(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
-        hidden_dim: int = 256,
+        hidden_dim: int = 128,
         num_layers: int = 7
     ):
         """
@@ -143,7 +143,7 @@ class MLPClassifierDeep(nn.Module):
         Returns:
             tensor (b, num_classes) logits
         """
-        self.model(x)
+        return self.model(x)
 
 
 class MLPClassifierDeepResidual(nn.Module):
@@ -152,6 +152,8 @@ class MLPClassifierDeepResidual(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
+        hidden_dim: int = 128,
+        num_layers: int = 10
     ):
         """
         Args:
@@ -163,19 +165,47 @@ class MLPClassifierDeepResidual(nn.Module):
             hidden_dim: int, size of hidden layers
             num_layers: int, number of hidden layers
         """
-        super().__init__()
+        super(MLPClassifierDeepResidual, self).__init__()
 
-        raise NotImplementedError("MLPClassifierDeepResidual.__init__() is not implemented")
+        class ResidualBlock(nn.Module):
+          def __init__(self, hidden_dim):
+              super(ResidualBlock, self).__init__()
+              self.block = nn.Sequential(
+              nn.Linear(hidden_dim, hidden_dim),
+              nn.ReLU(),
+              nn.Linear(hidden_dim, hidden_dim)
+            )
 
+          def forward(self, x):
+            return x + self.block(x)
+        
+        layers = [
+          nn.Flatten(),
+          nn.Linear(h * w * 3, hidden_dim),
+          nn.ReLU()
+        ]
+
+        for _ in range(num_layers):
+          layers += [
+            ResidualBlock(hidden_dim),
+            nn.ReLU()
+          ]
+        
+        layers.append(
+          nn.Linear(hidden_dim, num_classes)
+        )
+        self.model = nn.Sequential(*layers)
+
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: tensor (b, 3, H, W) image
+      """
+      Args:
+          x: tensor (b, 3, H, W) image
 
-        Returns:
-            tensor (b, num_classes) logits
-        """
-        raise NotImplementedError("MLPClassifierDeepResidual.forward() is not implemented")
+      Returns:
+          tensor (b, num_classes) logits
+      """
+      return self.model(x)
 
 
 model_factory = {
