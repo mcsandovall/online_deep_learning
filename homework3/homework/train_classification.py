@@ -1,17 +1,14 @@
-# We have to create a training loop for the classification model
 import argparse
 from datetime import datetime
 from pathlib import Path
-
 import numpy as np
 import torch
 import torch.utils.tensorboard as tb
-
-from .models import Classifier, load_model, save_model
-from .metrics import AccuracyMetric, DetectionMetric, ConfusionMatrix
+from .models import load_model, save_model
 from .utils import load_data
 
-def train_classification(
+
+def train(
     exp_dir: str = "logs",
     model_name: str = "linear",
     num_epoch: int = 50,
@@ -46,10 +43,17 @@ def train_classification(
 
     # create loss function and optimizer
     loss_func = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epoch * len(train_data))
+
     global_step = 0
-    metrics = {"train_acc": [], "val_acc": []}
+    metrics = {"train_acc": [],
+                "val_acc": [],
+                "train_loss": [],
+                "val_loss": []}
+
     # training loop
+    best_val_acc = 0.0
     for epoch in range(num_epoch):
         # clear metrics at beginning of epoch
         for key in metrics:
@@ -57,56 +61,85 @@ def train_classification(
 
         model.train()
 
-        for images, labels in train_data:
-            images, labels = images.to(device), labels.to(device)
+        for img, label in train_data:
+            img, label = img.to(device), label.to(device)
 
+            # zero gradients for every batch
             optimizer.zero_grad()
-            outputs = model(images)
-            loss = loss_func(outputs, labels)
+
+            # make prediction for this batch
+            pred = model(img)
+
+            # compute loss and gradients, update parameters
+            loss = loss_func(pred, label)
             loss.backward()
+
+            #adjust learning weights
             optimizer.step()
 
-            acc = (outputs.argmax(dim=1) == labels).float().mean().item()
+            # compute accuracy and save to metrics
+            acc = (pred.argmax(dim=1) == label).float().mean()
             metrics["train_acc"].append(acc)
+            metrics["train_loss"].append(loss.item())
 
-        # validation loop
-        model.eval()
-        with torch.no_grad():
-            for images, labels in val_data:
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
-                acc = (outputs.argmax(dim=1) == labels).float().mean().item()
+            global_step += 1
+            scheduler.step()
+
+        # disable gradient computation and switch to evaluation mode
+        with torch.inference_mode():
+            model.eval()
+
+            for img, label in val_data:
+                img, label = img.to(device), label.to(device)
+                pred = model(img)
+                acc = (pred.argmax(dim=1) == label).float().mean()
                 metrics["val_acc"].append(acc)
+                val_loss = loss_func(pred, label)
+                metrics["val_loss"].append(val_loss.item())
 
-        # log average metrics to tensorboard
-        avg_train_acc = np.mean(metrics["train_acc"])
-        avg_val_acc = np.mean(metrics["val_acc"])
-        logger.add_scalar("Accuracy/Train", avg_train_acc, global_step)
-        logger.add_scalar("Accuracy/Val", avg_val_acc, global_step)
+        # log average train and val accuracy to tensorboard
+        epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
+        epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
+        epoch_train_loss = torch.as_tensor(metrics["train_loss"]).mean()
+        epoch_val_loss = torch.as_tensor(metrics["val_loss"]).mean()
 
+        logger.add_scalar("train_acc", epoch_train_acc, global_step=global_step)
+        logger.add_scalar("val_acc", epoch_val_acc, global_step=global_step)
+        logger.add_scalar("train_loss", epoch_train_loss, global_step=global_step)
+        logger.add_scalar("val_loss", epoch_val_loss, global_step=global_step)
+
+        # print on first, last, every 10th epoch
         if epoch == 0 or epoch == num_epoch - 1 or (epoch + 1) % 10 == 0:
             print(
                 f"Epoch {epoch + 1:2d} / {num_epoch:2d}: "
-                f"train_acc={avg_train_acc:.4f} "
-                f"val_acc={avg_val_acc:.4f}"
+                f"train_acc={epoch_train_acc:.4f} "
+                f"val_acc={epoch_val_acc:.4f}"
             )
-        
-    # save model checkpoint at end of training
+        # save model checkpoint if val accuracy improves
+        if epoch_val_acc > best_val_acc:
+            best_val_acc = epoch_val_acc
+            save_model(model, log_dir / f"{model_name}_best.pt")
+            print(f"New best model saved with val_acc={best_val_acc:.4f}")
+
+    # save and overwrite the model in the root directory for grading
     save_model(model)
 
-    # save a copy of the model weights to the homework directory for grading
+    # save a copy of model weights in the log directory
     torch.save(model.state_dict(), log_dir / f"{model_name}.th")
     print(f"Model saved to {log_dir / f'{model_name}.th'}")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
     parser.add_argument("--exp_dir", type=str, default="logs")
-    parser.add_argument("--model_name", type=str, default="linear")
+    parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--num_epoch", type=int, default=50)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--seed", type=int, default=2024)
 
-    args = parser.parse_args()
+    # optional: additional model hyperparamters
+    # parser.add_argument("--num_layers", type=int, default=3)
 
-    train_classification(**vars(args))
+    # pass all arguments to train
+    train(**vars(parser.parse_args()))
