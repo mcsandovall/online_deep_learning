@@ -132,7 +132,7 @@ def train(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--exp_dir", type=str, default="logs")
+    parser.add_argument("--exp_dir", type=str, default="classfier")
     parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--num_epoch", type=int, default=50)
     parser.add_argument("--lr", type=float, default=1e-3)
