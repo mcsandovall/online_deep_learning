@@ -21,13 +21,39 @@ class Classifier(nn.Module):
             in_channels: int, number of input channels
             num_classes: int
         """
-        super().__init__()
+        super(Classifier, self).__init__()
 
+        # TODO: implement
+        
+        # input normalization stats
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # TODO: implement
-        pass
+        self.features = nn.Sequential(
+            # block 1
+            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+
+            # block 2
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+
+            # block 3
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+        )
+
+        # average pooling
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+        # classifier head
+        self.classifier = nn.Linear(128, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -41,7 +67,14 @@ class Classifier(nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 6)
+        z = self.features(z)
+
+        # global average pooling
+        z = self.global_pool(z)
+        z = torch.flatten(z, 1)
+
+        # classifier
+        logits = self.classifier(z)
 
         return logits
 
