@@ -76,14 +76,14 @@ def train(
 
             #adjust learning weights
             optimizer.step()
+            scheduler.step()
 
             # compute accuracy and save to metrics
             acc = (pred.argmax(dim=1) == label).float().mean()
-            metrics["train_acc"].append(acc)
+            metrics["train_acc"].append(acc.item())
             metrics["train_loss"].append(loss.item())
 
             global_step += 1
-            scheduler.step()
 
         # disable gradient computation and switch to evaluation mode
         with torch.inference_mode():
@@ -93,7 +93,7 @@ def train(
                 img, label = img.to(device), label.to(device)
                 pred = model(img)
                 acc = (pred.argmax(dim=1) == label).float().mean()
-                metrics["val_acc"].append(acc)
+                metrics["val_acc"].append(acc.item())
                 val_loss = loss_func(pred, label)
                 metrics["val_loss"].append(val_loss.item())
 
