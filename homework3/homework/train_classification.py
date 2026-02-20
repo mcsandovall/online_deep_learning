@@ -10,7 +10,7 @@ from .utils import load_data
 
 def train(
     exp_dir: str = "logs",
-    model_name: str = "linear",
+    model_name: str = "classifier",
     num_epoch: int = 50,
     lr: float = 1e-3,
     batch_size: int = 128,
@@ -118,7 +118,7 @@ def train(
         # save model checkpoint if val accuracy improves
         if epoch_val_acc > best_val_acc:
             best_val_acc = epoch_val_acc
-            save_model(model, log_dir / f"{model_name}_best.pt")
+            save_model(model)
             print(f"New best model saved with val_acc={best_val_acc:.4f}")
 
     # save and overwrite the model in the root directory for grading
