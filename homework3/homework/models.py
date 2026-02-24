@@ -108,11 +108,36 @@ class Detector(torch.nn.Module):
         """
         super().__init__()
 
+        # TODO: implement
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # TODO: implement
-        pass
+        # backbone feature extractor
+        self.features = nn.Sequential(
+            # block 1
+            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+
+            # block 2
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+
+            # block 3
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+        )
+
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.bbox_head = nn.Linear(128, 4)
+
+        self.class_head = nn.Linear(128, num_classes)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -131,10 +156,14 @@ class Detector(torch.nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 3, x.size(2), x.size(3))
-        raw_depth = torch.rand(x.size(0), x.size(2), x.size(3))
+        z = self.features(z)
+        z = self.global_pool(z)
+        z = torch.flatten(z, 1)
 
-        return logits, raw_depth
+        bbox = self.bbox_head(z)
+        class_logits = self.class_head(z)
+
+        return bbox, class_logits
 
     def predict(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
