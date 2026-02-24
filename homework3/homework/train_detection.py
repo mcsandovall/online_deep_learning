@@ -40,8 +40,8 @@ def train(
     model = model.to(device)
 
     # load the dataset
-    train_data = load_data("drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
-    val_data = load_data("drive_data/val", shuffle=False)
+    train_data = load_data("/content/online_deep_learning/homework3/drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
+    val_data = load_data("/content/online_deep_learning/homework3/drive_data/val", shuffle=False)
 
     # optimizer
     optimizer = torch.optim.AdamW(
@@ -113,7 +113,7 @@ def train(
 
                 # get the segmentation predictions and update confusion matrix
                 seg_pred = seg_logits.argmax(dim=1)
-                evaluator.update(seg_pred.cpu(), seg_gt.cpu())
+                evaluator.add(seg_pred.cpu(), seg_gt.cpu())
 
                 # depth metrics
                 abs_error = torch.abs(depth_pred - depth_gt)
@@ -128,7 +128,7 @@ def train(
         
         # compute and log validation metrics
         val_metrics = evaluator.compute()
-        mean_iou = val_metrics["mean_iou"]
+        mean_iou = val_metrics["iou"]
 
         logger.add_scalar("train_loss", train_loss, global_step=epoch)
         logger.add_scalar("val_loss", depth_mae / total_pixels, global_step=epoch)
