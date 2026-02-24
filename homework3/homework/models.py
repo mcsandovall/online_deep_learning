@@ -106,38 +106,62 @@ class Detector(torch.nn.Module):
             in_channels: int, number of input channels
             num_classes: int
         """
-        super().__init__()
+        super(Detector, self).__init__()
 
         # TODO: implement
+
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # backbone feature extractor
-        self.features = nn.Sequential(
-            # block 1
+        # encoder 
+        self.down1 = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2),
+        )
 
-            # block 2
+        self.down2 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2),
+        )
 
-            # block 3
+        self.down3 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2),
         )
 
-        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        # decoder
 
-        self.bbox_head = nn.Linear(128, 4)
+        self.up1 = nn.Sequential(
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+        )
 
-        self.class_head = nn.Linear(128, num_classes)
+        self.up2 = nn.Sequential(
+            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+        )
+
+        self.up3 = nn.Sequential(
+            nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+        )
+
+        # heads
+        self.class_head = nn.Conv2d(16, num_classes, kernel_size=1)
+        self.depth_head = nn.Sequential(
+            nn.Conv2d(16, 1, kernel_size=1),
+            nn.Sigmoid(),  # normalize depth to [0, 1]
+        )
+       
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -156,14 +180,22 @@ class Detector(torch.nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         # TODO: replace with actual forward pass
-        z = self.features(z)
-        z = self.global_pool(z)
-        z = torch.flatten(z, 1)
+       
+        # encoder
+        z = self.down1(z)
+        z = self.down2(z)
+        z = self.down3(z)
 
-        bbox = self.bbox_head(z)
+        # decoder
+        z = self.up1(z)
+        z = self.up2(z)
+        z = self.up3(z)
+
+        # heads
         class_logits = self.class_head(z)
+        depth = self.depth_head(z).squeeze(1)
 
-        return bbox, class_logits
+        return class_logits, depth
 
     def predict(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
