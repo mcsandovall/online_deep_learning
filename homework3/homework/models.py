@@ -115,22 +115,22 @@ class Detector(torch.nn.Module):
 
         # encoder 
         self.down1 = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
-        )
-
-        self.down2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2),
         )
 
-        self.down3 = nn.Sequential(
+        self.down2 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+        )
+
+        self.down3 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2),
         )
@@ -138,27 +138,27 @@ class Detector(torch.nn.Module):
         # decoder
 
         self.up1 = nn.Sequential(
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+        )
+
+        self.up2 = nn.Sequential(
             nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
         )
 
-        self.up2 = nn.Sequential(
+        self.up3 = nn.Sequential(
             nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
         )
 
-        self.up3 = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2),
-            nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
-        )
-
         # heads
-        self.class_head = nn.Conv2d(16, num_classes, kernel_size=1)
+        self.class_head = nn.Conv2d(32, num_classes, kernel_size=1)
         self.depth_head = nn.Sequential(
-            nn.Conv2d(16, 1, kernel_size=1),
+            nn.Conv2d(32, 1, kernel_size=1),
             nn.Sigmoid(),  # normalize depth to [0, 1]
         )
        
