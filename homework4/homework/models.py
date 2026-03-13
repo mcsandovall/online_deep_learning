@@ -43,7 +43,16 @@ class MLPPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError
+        # Concatenate left and right track points and flatten
+        x = torch.cat([track_left, track_right], dim=1)  # shape (b, 2*n_track, 2)
+        x = x.view(x.size(0), -1)  # shape (b, 4*n_track)   
+        # Simple MLP with one hidden layer
+        hidden = nn.Linear(4 * self.n_track, 128)
+        output = nn.Linear(128, 2 * self.n_waypoints)
+        x = torch.relu(hidden(x))
+        x = output(x)
+        x = x.view(x.size(0), self.n_waypoints, 2)
+        return x
 
 
 class TransformerPlanner(nn.Module):
