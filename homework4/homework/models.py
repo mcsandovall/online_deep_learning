@@ -73,8 +73,37 @@ class TransformerPlanner(nn.Module):
 
         self.n_track = n_track
         self.n_waypoints = n_waypoints
+        nhead = 4
+        num_layers = 2
+
+        self.input_proj = nn.Linear(2, d_model)
+
+        # positional encoding
+        self.pos_embedding = nn.Parameter(
+            torch.randn(1, 2 * n_track, d_model)
+        )
+
+        # encoder 
+        encoder_layer = nn.TransformerEncoderLayer(
+          d_model=d_model,
+          nhead=nhead,
+          batch_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers)
 
         self.query_embed = nn.Embedding(n_waypoints, d_model)
+
+        # decode layer
+        decode_layer = nn.TransformerDecoderLayer(
+          d_model=d_model,
+          nhead=nhead,
+          batch_first=True,
+        )
+
+        self.decoder = nn.TransformerDecoder(decode_layer, num_layers)
+
+        self.output_proj = nn.Linear(d_model, 2)
+
 
     def forward(
         self,
@@ -95,7 +124,27 @@ class TransformerPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError
+        b = track_left.size(0)
+
+        x = torch.cat([track_left, track_right], dim=1)
+
+        # embed
+        x = self.input_proj(x)
+        x = x + self.pos_embedding
+
+        # encode track
+        memory = self.encoder(x)
+
+        # prepare the queries
+        query = self.query_embed.weight.unsqueeze(0).repeat(b, 1, 1)
+
+        # deocode
+        hs = self.decoder(query, memory)
+
+        # project onto x,y
+        out = self.output_proj(hs)
+
+        return out
 
 
 class CNNPlanner(torch.nn.Module):
