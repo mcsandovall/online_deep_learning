@@ -50,8 +50,8 @@ def train(
     model = model.to(device)
 
     # load the dataset
-    train_data = load_data("homework3/drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
-    val_data = load_data("homework3/drive_data/val", shuffle=False)
+    train_data = load_data("homework4/drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
+    val_data = load_data("homework4/drive_data/val", shuffle=False)
 
     # optimizer
     optimizer = torch.optim.AdamW(
