@@ -159,7 +159,7 @@ class CNNPlanner(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN), persistent=False)
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD), persistent=False)
 
-        # same as before
+        #  create a simple CNN
         self.cnn = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
