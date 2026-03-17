@@ -50,8 +50,8 @@ def train(
     model = model.to(device)
 
     # load the dataset
-    train_data = load_data("homework4/drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
-    val_data = load_data("homework4/drive_data/val", shuffle=False)
+    train_data = load_data("/content/online_deep_learning/homework4/drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
+    val_data = load_data("/content/online_deep_learning/homework4/drive_data/val", shuffle=False)
 
     # optimizer
     optimizer = torch.optim.AdamW(
@@ -78,12 +78,17 @@ def train(
         for batch in train_data:
             batch = {k: v.to(device) for k, v in batch.items()}
             waypoints_gt = batch["waypoints"].to(device)
+            track_left = batch["track_left"].to(device)
+            track_right = batch["track_right"].to(device)
 
             # zero gradients for every batch
             optimizer.zero_grad()
 
             # predict waypoints and compute loss
-            waypoints_pred = model(batch)
+            waypoints_pred = model(
+              track_left=batch["track_left"],
+              track_right=batch["track_right"],
+            )
 
             # compute losses
             loss = loss_func(waypoints_pred, waypoints_gt)
@@ -106,10 +111,15 @@ def train(
         with torch.no_grad():
             for batch in val_data:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                waypoints_gt = batch["waypoints"]
-                waypoints_mask = batch["waypoints_mask"]
+                waypoints_gt = batch["waypoints"].to(device)
+                waypoints_mask = batch["waypoints_mask"].to(device)
+                track_left = batch["track_left"].to(device)
+                track_right = batch["track_right"].to(device)
 
-                waypoints_pred = model(batch)
+                waypoints_pred = model(
+                  track_left=track_left,
+                  track_right=track_right,
+                )
 
                 # get the segmentation predictions and update confusion matrix
                 evaluator.add(waypoints_pred, waypoints_gt, waypoints_mask)
