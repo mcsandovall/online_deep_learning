@@ -22,7 +22,7 @@ from .metrics import PlannerMetric
 
 def train(
     exp_dir: str = "logs",
-    model_name: str = "detector",
+    model_name: str = "mlp_planner",
     num_epoch: int = 50,
     lr: float = 1e-4,
     batch_size: int = 4,
@@ -85,10 +85,15 @@ def train(
             optimizer.zero_grad()
 
             # predict waypoints and compute loss
-            waypoints_pred = model(
-              track_left=batch["track_left"],
-              track_right=batch["track_right"],
-            )
+            if model_name == "cnn_planner":
+              waypoints_pred = model(
+                image = batch['image'].to(device)
+              )
+            else:
+              waypoints_pred = model(
+                track_left=batch["track_left"],
+                track_right=batch["track_right"],
+              )
 
             # compute losses
             loss = loss_func(waypoints_pred, waypoints_gt)
@@ -116,9 +121,14 @@ def train(
                 track_left = batch["track_left"].to(device)
                 track_right = batch["track_right"].to(device)
 
-                waypoints_pred = model(
-                  track_left=track_left,
-                  track_right=track_right,
+                if model_name == "cnn_planner":
+                  waypoints_pred = model(
+                    image = batch['image'].to(device)
+                )
+                else:
+                  waypoints_pred = model(
+                    track_left=batch["track_left"],
+                    track_right=batch["track_right"],
                 )
 
                 # get the segmentation predictions and update confusion matrix
