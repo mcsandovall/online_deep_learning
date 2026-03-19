@@ -73,20 +73,20 @@ class TransformerPlanner(nn.Module):
         self,
         n_track: int = 10,
         n_waypoints: int = 3,
-        d_model: int = 64,
+        d_model: int = 128,
     ):
         super().__init__()
 
         self.n_track = n_track
         self.n_waypoints = n_waypoints
-        nhead = 4
-        num_layers = 2
+        nhead = 8
+        num_layers = 3
 
         self.input_proj = nn.Linear(2, d_model)
 
         # positional encoding
         self.pos_embedding = nn.Parameter(
-            torch.randn(1, 2 * n_track, d_model)
+            torch.randn(1, 3 * n_track, d_model)
         )
 
         # encoder 
@@ -132,7 +132,8 @@ class TransformerPlanner(nn.Module):
         """
         b = track_left.size(0)
 
-        x = torch.cat([track_left, track_right], dim=1)
+        center = (track_left + track_right) / 2
+        x = torch.cat([track_left, track_right, center], dim=1)
 
         # embed
         x = self.input_proj(x)
@@ -142,6 +143,7 @@ class TransformerPlanner(nn.Module):
         memory = self.encoder(x)
 
         # prepare the queries
+
         query = self.query_embed.weight.unsqueeze(0).repeat(b, 1, 1)
 
         # deocode
