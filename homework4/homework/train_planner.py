@@ -65,7 +65,7 @@ def train(
         T_max=num_epoch * len(train_data),
     )
 
-    loss_func = torch.nn.MSELoss()
+    loss_func = torch.nn.SmoothL1Loss()
     best_val_error = float("inf")
 
     # training loop
@@ -80,6 +80,7 @@ def train(
             waypoints_gt = batch["waypoints"].to(device)
             track_left = batch["track_left"].to(device)
             track_right = batch["track_right"].to(device)
+            mask = batch["waypoints_mask"].unsqueeze(-1)  
 
             # zero gradients for every batch
             optimizer.zero_grad()
@@ -96,17 +97,19 @@ def train(
               )
 
             # compute losses
-            loss = loss_func(waypoints_pred, waypoints_gt)
+
+            loss = ((waypoints_pred - waypoints_gt) ** 2 * mask).sum() / mask.sum()
 
             loss.backward()
+            # clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             optimizer.step()
+            scheduler.step()
 
             # compute accumalative loss
             total_loss += loss.item()
 
-        # step scheduler after each epoch
-        scheduler.step()
         train_loss = total_loss / len(train_data)
 
         # validation
@@ -136,6 +139,7 @@ def train(
         
         # compute and log validation metrics
         val_metrics = evaluator.compute()
+        val_l1 = val_metrics["l1_error"] / val_metrics["num_samples"]
 
         logger.add_scalar("train_loss", train_loss, global_step=epoch)
         logger.add_scalar("val_loss", val_metrics["l1_error"] / val_metrics["num_samples"], global_step=epoch)
@@ -143,8 +147,8 @@ def train(
         logger.add_scalar("val_lateral_error", val_metrics["lateral_error"] / val_metrics["num_samples"], global_step=epoch)
 
         # save best model
-        if epoch == 0 or val_metrics["l1_error"] < best_val_error:
-            best_val_error = val_metrics["l1_error"]
+        if epoch == 0 or val_l1 < best_val_error:
+            best_val_error = val_l1
             save_model(model)
             print(f"Epoch {epoch}: New best model with L1 error {best_val_error:.4f}")
 
@@ -170,5 +174,3 @@ if __name__ == "__main__":
 
     # pass all arguments to train
     train(**vars(parser.parse_args()))
-
-
