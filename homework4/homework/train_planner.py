@@ -8,6 +8,16 @@ Usage:
     python3 -m homework.train_planner --your_args here
 """
 
+"""
+Usage:
+    python3 -m homework.train_planner --your_args here
+"""
+
+"""
+Usage:
+    python3 -m homework.train_planner --your_args here
+"""
+
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -98,18 +108,21 @@ def train(
 
             # compute losses
 
-            loss = ((waypoints_pred - waypoints_gt) ** 2 * mask).sum() / mask.sum()
+            loss = (
+              loss_func(waypoints_pred[..., 0], waypoints_gt[..., 0]) +
+              3.0 * loss_func(waypoints_pred[..., 1], waypoints_gt[..., 1])
+            )
 
             loss.backward()
             # clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             optimizer.step()
-            scheduler.step()
 
             # compute accumalative loss
             total_loss += loss.item()
 
+        scheduler.step()
         train_loss = total_loss / len(train_data)
 
         # validation
@@ -139,7 +152,9 @@ def train(
         
         # compute and log validation metrics
         val_metrics = evaluator.compute()
-        val_l1 = val_metrics["l1_error"] / val_metrics["num_samples"]
+        val_loss = val_metrics["l1_error"] / val_metrics["num_samples"]
+        val_longitudinal_error = val_metrics["longitudinal_error"] / val_metrics["num_samples"]
+        val_lateral_error = val_metrics["lateral_error"] / val_metrics["num_samples"]
 
         logger.add_scalar("train_loss", train_loss, global_step=epoch)
         logger.add_scalar("val_loss", val_metrics["l1_error"] / val_metrics["num_samples"], global_step=epoch)
@@ -147,10 +162,10 @@ def train(
         logger.add_scalar("val_lateral_error", val_metrics["lateral_error"] / val_metrics["num_samples"], global_step=epoch)
 
         # save best model
-        if epoch == 0 or val_l1 < best_val_error:
-            best_val_error = val_l1
+        if epoch == 0 or val_loss < best_val_error:
+            best_val_error = val_loss
             save_model(model)
-            print(f"Epoch {epoch}: New best model with L1 error {best_val_error:.4f}")
+            print(f"Epoch {epoch}: New best model with L1 error {best_val_error:.4f}, Longitudinal Error: {val_longitudinal_error:.4f} Lateral Error: {val_lateral_error:.4f}")
 
     # save and overwrite the model in the root directory for grading
     save_model(model)
