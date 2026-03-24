@@ -25,12 +25,18 @@ class MLPPlanner(nn.Module):
         self.n_waypoints = n_waypoints
 
         self.model = nn.Sequential(
-          nn.Linear(4 * n_track, 256),
+          nn.Linear(3 * n_track, 256),
           nn.ReLU(),
+          nn.LayerNorm(256),
+
           nn.Linear(256, 256),
           nn.ReLU(),
+          nn.LayerNorm(256),
+
           nn.Linear(256, 128),
           nn.ReLU(),
+          nn.LayerNorm(128),
+          
           nn.Linear(128, 2 * n_waypoints)
         )
 
@@ -53,10 +59,12 @@ class MLPPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        center = (track_left + track_right) / 2              # (B, n_track, 2)
-        width = track_left - track_right 
+        center = (track_left + track_right) / 2
+        center = center - center.mean(dim=1, keepdim=True)
+        
+        width = torch.norm(track_left - track_right, dim=-1, keepdim=True)
         # Concatenate left and right track points and flatten
-        x = torch.cat([center, width], dim=1)  # shape (b, 2*n_track, 2)
+        x = torch.cat([center, width], dim=-1)  # shape (b, 2*n_track, 2)
         x = x.view(x.size(0), -1)  # shape (b, 4*n_track)   
 
         # pass thorugh the MLP
