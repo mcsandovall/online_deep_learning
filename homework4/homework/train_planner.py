@@ -3,21 +3,6 @@ Usage:
     python3 -m homework.train_planner --your_args here
 """
 
-"""
-Usage:
-    python3 -m homework.train_planner --your_args here
-"""
-
-"""
-Usage:
-    python3 -m homework.train_planner --your_args here
-"""
-
-"""
-Usage:
-    python3 -m homework.train_planner --your_args here
-"""
-
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -71,11 +56,11 @@ def train(
     )
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer,
-        T_max=num_epoch * len(train_data),
+      optimizer,
+      T_max=num_epoch
     )
 
-    loss_func = torch.nn.SmoothL1Loss()
+    loss_func = torch.nn.L1Loss()
     best_val_error = float("inf")
 
     # training loop
@@ -107,11 +92,9 @@ def train(
               )
 
             # compute losses
+            loss_raw = torch.abs(waypoints_pred - waypoints_gt)  # (B, n_waypoints, 2)
 
-            loss = (
-              loss_func(waypoints_pred[..., 0], waypoints_gt[..., 0]) +
-              3.0 * loss_func(waypoints_pred[..., 1], waypoints_gt[..., 1])
-            )
+            loss = (loss_raw * mask).sum() / (mask.sum() + 1e-6)
 
             loss.backward()
             # clipping
