@@ -118,29 +118,29 @@ class TransformerPlanner(nn.Module):
         b = track_left.size(0)
 
         center = (track_left + track_right) / 2
-        torch.norm(track_left - track_right, dim=-1, keepdim=True)
-
+        width = torch.norm(track_left - track_right, dim=-1, keepdim=True)
+    
         center = center - center.mean(dim=1, keepdim=True)
-
         scale = center.abs().max(dim=1, keepdim=True)[0] + 1e-6
+    
         center = center / scale
         width = width / scale
-
-        x = torch.cat([center, width], dim=-1)   # (B, n_track, 3)
-
-        x = self.input_proj(x)                   # (B, n_track, d_model)
+    
+        x = torch.cat([track_left, track_right, center, width], dim=-1)
+    
+        x = self.input_proj(x)
         x = self.input_norm(x)
         x = x + self.pos_embedding
-
+    
         memory = self.encoder(x)
-
+    
         query = self.query_embed.weight.unsqueeze(0).expand(b, -1, -1)
         query = query + self.query_pos
-
+    
         hs = self.decoder(query, memory)
-
+    
         out = self.output_proj(hs)
-
+    
         return torch.cumsum(out, dim=1)
 
 
