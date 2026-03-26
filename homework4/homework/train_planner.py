@@ -156,6 +156,7 @@ def train(
     # save a copy of model weights in the log directory
     torch.save(model.state_dict(), log_dir / f"{model_name}.th")
     print(f"Model saved to {log_dir / f'{model_name}.th'}")
+    return best_val_error
 
         
 if __name__ == "__main__":
