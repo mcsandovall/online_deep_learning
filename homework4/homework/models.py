@@ -158,18 +158,33 @@ class CNNPlanner(torch.nn.Module):
 
         #  create a simple CNN
         self.cnn = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
+            nn.MaxPool2d(2),
+
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+
             nn.AdaptiveAvgPool2d((1, 1)),
         )
 
         # add a mlp head to predict waypoints from the CNN features
         self.mlp = nn.Sequential(
-            nn.Linear(64, 128),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, 2 * n_waypoints),
         )
@@ -187,10 +202,11 @@ class CNNPlanner(torch.nn.Module):
 
         features = self.cnn(x)
         features = features.view(features.size(0), -1)
+        
         x = self.mlp(features)
         x = x.view(x.size(0), self.n_waypoints, 2)
 
-        return x
+        return torch.cumsum(x, dim=1)
 
 
 MODEL_FACTORY = {
