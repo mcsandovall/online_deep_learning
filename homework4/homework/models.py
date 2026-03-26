@@ -86,7 +86,7 @@ class TransformerPlanner(nn.Module):
         nhead = 4
         num_layers = 2
 
-        self.input_proj = nn.Linear(4, d_model)
+        self.input_proj = nn.Linear(8, d_model)
         self.input_norm = nn.LayerNorm(d_model)
 
         self.pos_embedding = nn.Parameter(
@@ -114,7 +114,11 @@ class TransformerPlanner(nn.Module):
         self.output_proj = nn.Linear(d_model, 2)
 
     def forward(self, track_left, track_right, **kwargs):
-
+        """
+        track_left:  (B, n_track, 2)
+        track_right: (B, n_track, 2)
+        """
+        
         b = track_left.size(0)
 
         center = (track_left + track_right) / 2
@@ -126,7 +130,7 @@ class TransformerPlanner(nn.Module):
         center = center / scale
         width = width / scale
     
-        x = torch.cat([center, width], dim=-1)
+        x = torch.cat([track_left, track_right, center, width], dim=-1)
     
         x = self.input_proj(x)
         x = self.input_norm(x)
