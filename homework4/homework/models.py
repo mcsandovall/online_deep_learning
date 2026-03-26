@@ -126,7 +126,7 @@ class TransformerPlanner(nn.Module):
         center = center / scale
         width = width / scale
     
-        x = torch.cat([track_left, track_right, center, width], dim=-1)
+        x = torch.cat([center, width], dim=-1)
     
         x = self.input_proj(x)
         x = self.input_norm(x)
